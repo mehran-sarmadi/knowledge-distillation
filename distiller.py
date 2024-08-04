@@ -145,33 +145,11 @@ class Distiller(nn.Module):
           ICCT = torch.nn.functional.normalize(ICCT, dim = 1)
           lo_loss =  self.args.lo_lambda * (ICCS - ICCT).pow(2).mean()/b 
 
-        # Define Sobel kernels for edge detection
-        sobel_kernel_x = torch.tensor([[-1, 0, 1],
-                                    [-2, 0, 2],
-                                    [-1, 0, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0).cuda()
-        sobel_kernel_y = torch.tensor([[-1, -2, -1],
-                                    [0, 0, 0],
-                                    [1, 2, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0).cuda()
-
-        def apply_edge_filter_pytorch(feature_map_tensor):
-            # Initialize an empty tensor for the edge-detected feature map
-            edge_filtered_map = torch.zeros_like(feature_map_tensor)
-
-            # Iterate over the batch dimension
-            for b in range(feature_map_tensor.shape[0]):
-                # Apply Sobel filter separately for x and y directions
-                for c in range(feature_map_tensor.shape[1]):
-                    slice_2d = feature_map_tensor[b, c, :, :].unsqueeze(0).unsqueeze(0)
-                    edge_x = F.conv2d(slice_2d, sobel_kernel_x, padding=1)
-                    edge_y = F.conv2d(slice_2d, sobel_kernel_y, padding=1)
-
-                    # Calculate the gradient magnitude
-                    edge_magnitude = torch.sqrt(edge_x**2 + edge_y**2).squeeze()
-
-                    # Store the result in the edge_filtered_map
-                    edge_filtered_map[b, c, :, :] = edge_magnitude
-
-            return edge_filtered_map
+        def fft_2d(input_tensor):
+            if not torch.is_complex(input_tensor):
+                input_tensor = input_tensor.to(torch.complex64)
+                fft_result = torch.fft.fft2(input_tensor, dim=(-2, -1))
+            return fft_result
 
         def pixel_affinity_loss(a_s, a_t):
             assert a_s.shape == a_t.shape
@@ -182,9 +160,17 @@ class Distiller(nn.Module):
             loss = loss_per_element.mean() / normalization_factor
             return loss
         
-        new_loss = 0
-        if self.args.new_loss is not None:
-            new_loss = self.args.new_loss * pixel_affinity_loss(apply_edge_filter_pytorch(t_out), apply_edge_filter_pytorch(s_out))
+
+        t_fft = fft_2d(t_out)
+        s_fft = fft_2d(s_out)
+                       
+        abs_loss = 0
+        if self.args.abs_loss is not None:
+            abs_loss = self.args.abs_loss * pixel_affinity_loss(torch.abs(t_fft), torch.abs(s_fft))
+        angle_loss = 0
+        if self.args.angle_loss is not None:
+            angle_loss = self.args.angle_loss * pixel_affinity_loss(torch.angle(t_fft), torch.angle(s_fft))
+        
 
 
-        return s_out, new_loss, pa_loss, pi_loss, ic_loss, lo_loss
+        return s_out, abs_loss, angle_loss, pa_loss, pi_loss, ic_loss, lo_loss

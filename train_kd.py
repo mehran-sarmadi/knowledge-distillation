@@ -122,7 +122,7 @@ class Trainer(object):
             self.scheduler(optimizer, i, epoch, self.best_pred)
             optimizer.zero_grad()
             
-            output, new_loss, pa_loss, pi_loss, ic_loss, lo_loss = self.d_net(image)
+            output, abs_loss, angle_loss, pa_loss, pi_loss, ic_loss, lo_loss = self.d_net(image)
             loss_seg = self.criterion(output, target)
             
             ########### uncomment lines below for ALW ##################
@@ -131,7 +131,7 @@ class Trainer(object):
             
             ############# Comment line blow in case of ALW ################
             # print(loss_seg, new_loss)
-            loss = loss_seg + new_loss 
+            loss = loss_seg + abs_loss + angle_loss
             
             loss.backward()
             optimizer.step()
@@ -274,7 +274,8 @@ def main():
                         help='coefficient for logits loss')
     parser.add_argument('--ic_lambda', type=float, default=None,
                         help='coefficient for inter class loss')
-    parser.add_argument('--new_loss', type=float, default=None)
+    parser.add_argument('--abs_loss', type=float, default=None)
+    parser.add_argument('--angle_loss', type=float, default=None)
     parser.add_argument('--teacher_path', type=str, default='/kaggle/working/checkpoint.pth.tar',
                         help='path to the pretrained teache')
 
