@@ -185,8 +185,8 @@ class Distiller(nn.Module):
         #######
         #######
           
-        t_out_filtered = self.apply_edge_filter_pytorch(t_out)
-        s_out_filtered = self.apply_edge_filter_pytorch(s_out) 
+        t_out_filtered = self._apply_edge_filter_pytorch(t_out)
+        s_out_filtered = self._apply_edge_filter_pytorch(s_out) 
         # print(self.args.sobel_lambda)
         sobel_loss = 0
         if self.args.sobel_lambda is not None:
