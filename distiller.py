@@ -174,7 +174,7 @@ class Distiller(nn.Module):
             return edge_filtered_map
 
         def pixel_affinity_loss(a_s, a_t):
-            assert a_s.shape == a_t.shape, 
+            assert a_s.shape == a_t.shape
             diff = (a_s - a_t) ** 2
             loss_per_element = diff.sum(dim=[1, 2, 3])
             _, _, width, height = a_s.shape
