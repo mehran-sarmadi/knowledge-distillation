@@ -83,6 +83,42 @@ class Distiller(nn.Module):
         self.criterion = sim_dis_compute
         self.temperature = 1
         self.scale = 0.5
+        
+        ############
+        ############
+        self.sobel_kernel_x = torch.tensor([[-1, 0, 1],
+                               [-2, 0, 2],
+                               [-1, 0, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0).detach().cuda()
+        
+
+        self.sobel_kernel_y = torch.tensor([[-1, -2, -1],
+                                [0, 0, 0],
+                               [1, 2, 1]], dtype=torch.float32).unsqueeze(0).unsqueeze(0).detach().cuda()
+
+
+        ############
+        ############
+
+    def _apply_edge_filter_pytorch(self, feature_map_tensor):
+
+        # Initialize an empty tensor for the edge-detected feature map
+        edge_filtered_map = torch.zeros_like(feature_map_tensor)
+
+        # Iterate over the batch dimension
+        for b in range(feature_map_tensor.shape[0]):
+            # Apply Sobel filter separately for x and y directions
+            for c in range(feature_map_tensor.shape[1]):
+                slice_2d = feature_map_tensor[b, c, :, :].unsqueeze(0).unsqueeze(0)
+                edge_x = F.conv2d(slice_2d, self.sobel_kernel_x, padding=1)
+                edge_y = F.conv2d(slice_2d, self.sobel_kernel_y, padding=1)
+
+                # Calculate the gradient magnitude
+                edge_magnitude = torch.sqrt(edge_x**2 + edge_y**2).squeeze()
+
+                # Store the result in the edge_filtered_map
+                edge_filtered_map[b, c, :, :] = edge_magnitude
+
+        return edge_filtered_map
 
     def forward(self, x):
 
@@ -145,4 +181,20 @@ class Distiller(nn.Module):
           ICCT = torch.nn.functional.normalize(ICCT, dim = 1)
           lo_loss =  self.args.lo_lambda * (ICCS - ICCT).pow(2).mean()/b 
 
-        return s_out, pa_loss, pi_loss, ic_loss, lo_loss
+
+        #######
+        #######
+          
+        sobel_loss = 0
+        if self.args.sobel_lambda is not None:
+          t_out_filtered = self._apply_edge_filter_pytorch(t_out)
+          s_out_filtered = self._apply_edge_filter_pytorch(s_out) 
+     
+          TF = F.normalize(t_out_filtered.pow(2).mean(1)) 
+          SF = F.normalize(s_out_filtered.pow(2).mean(1)) 
+          sobel_loss = self.args.sobel_lambda * (TF - SF).pow(2).mean()
+
+        ########
+        #######
+
+        return s_out, sobel_loss, pa_loss, pi_loss, ic_loss, lo_loss
