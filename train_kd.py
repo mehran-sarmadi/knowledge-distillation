@@ -130,7 +130,7 @@ class Trainer(object):
             #loss = alpha * (loss_seg + lo_loss) + (1-alpha) * pi_loss
             
             ############# Comment line blow in case of ALW ################
-            print(loss_seg, new_loss)
+            # print(loss_seg, new_loss)
             loss = loss_seg + new_loss 
             
             loss.backward()
