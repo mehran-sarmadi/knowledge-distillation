@@ -185,23 +185,13 @@ class Distiller(nn.Module):
         #######
         #######
           
+        t_out_filtered = self.apply_edge_filter_pytorch(t_out)
+        s_out_filtered = self.apply_edge_filter_pytorch(s_out) 
+        # print(self.args.sobel_lambda)
         sobel_loss = 0
         if self.args.sobel_lambda is not None:
-          t_out_filtered = self._apply_edge_filter_pytorch(t_out)
-          s_out_filtered = self._apply_edge_filter_pytorch(s_out) 
-     
-          b, c, h, w = s_out.shape
-          s_logit = torch.reshape(s_out_filtered, (b, c, h*w))
-          t_logit = torch.reshape(t_out_filtered, (b, c, h*w))
+          sobel_loss =  self.args.sobel_lambda  * torch.nn.KLDivLoss()(F.log_softmax(s_out_filtered / self.temperature, dim=1), F.softmax(t_out_filtered / self.temperature, dim=1))
 
-          ICCT = torch.bmm(t_logit, t_logit.permute(0,2,1))
-          ICCT = torch.nn.functional.normalize(ICCT, dim = 2)
-
-          ICCS = torch.bmm(s_logit, s_logit.permute(0,2,1))
-          ICCS = torch.nn.functional.normalize(ICCS, dim = 2)
-
-          G_diff = ICCS - ICCT
-          sobel_loss = self.args.sobel_lambda * (G_diff * G_diff).view(b, -1).sum() / (c*b)
 
         ########
         #######
